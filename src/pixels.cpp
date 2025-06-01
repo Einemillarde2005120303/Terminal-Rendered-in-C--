@@ -1,8 +1,7 @@
 #include <sstream>
 #include <iostream>
-#include <vector>
+#include <unordered_map>
 #include <tuple>
-#include <algorithm>
 #include <windows.h>
 
 const std::string block = "\u2580";
@@ -20,21 +19,19 @@ std::string pos(int x, int y) {
     return "\x1b[" + std::to_string(y) + ";" + std::to_string(x) + "H";
 }
 
+struct pair_hash {
+    size_t operator()(const std::pair<int, int>& p) const {
+        return std::hash<int>()(p.first) ^ (std::hash<int>()(p.second) << 1);
+    }
+};
+
 class Pixel {
     private:
-        inline static std::vector<std::pair<int, int>> coords = {};
-        inline static std::vector<std::tuple<int, int, int>> colors = {};
+        inline static std::unordered_map<std::pair<int, int>, std::tuple<int, int, int>, pair_hash> pixel_map;
 
     public:
         Pixel(int x, int y, std::tuple<int, int, int> color) {
-            auto it = std::find(coords.begin(), coords.end(), std::make_pair(x, y));
-            if (it != coords.end()) {
-                size_t n = std::distance(coords.begin(), it);
-                coords.erase(coords.begin() + n);
-                colors.erase(colors.begin() + n);
-            }
-            coords.push_back({x, y});
-            colors.push_back(color);
+            pixel_map[{x, y}] = color;
         }
 
         static void draw_pixels() {
@@ -42,10 +39,9 @@ class Pixel {
             std::ostringstream oss;
             oss << "\x1b[2J\x1b[H";
 
-            for (size_t n = 0; n < coords.size(); ++n) {
-                int x = coords[n].first;
-                int y = coords[n].second;
-                auto color = colors[n];
+            for (const auto& [coord, color] : pixel_map) {
+                int x = coord.first;
+                int y = coord.second;
 
                 int fg_[3] = {0, 0, 0};
                 int bg_[3] = {0, 0, 0};
@@ -55,40 +51,25 @@ class Pixel {
                     fg_[1] = std::get<1>(color);
                     fg_[2] = std::get<2>(color);
 
-                    auto it = std::find(coords.begin(), coords.end(), std::make_pair(x, y + 1));
-                    if (it != coords.end()) {
-                        size_t idx = std::distance(coords.begin(), it);
-                        auto c = colors[idx];
+                    auto it = pixel_map.find({x, y + 1});
+                    if (it != pixel_map.end()) {
+                        auto c = it->second;
                         bg_[0] = std::get<0>(c);
                         bg_[1] = std::get<1>(c);
                         bg_[2] = std::get<2>(c);
                     }
-                } else {
-                    bg_[0] = std::get<0>(color);
-                    bg_[1] = std::get<1>(color);
-                    bg_[2] = std::get<2>(color);
+                } else continue;
 
-                    auto it = std::find(coords.begin(), coords.end(), std::make_pair(x, y - 1));
-                    if (it != coords.end()) {
-                        size_t idx = std::distance(coords.begin(), it);
-                        auto c = colors[idx];
-                        fg_[0] = std::get<0>(c);
-                        fg_[1] = std::get<1>(c);
-                        fg_[2] = std::get<2>(c);
-                    }
-                }
-
-                std::string p1 = pos(x + 1, (y / 2) + 1);
-                std::string p2 = fg(fg_[0], fg_[1], fg_[2]);
-                std::string p3 = bg(bg_[0], bg_[1], bg_[2]);
-
-                oss << p1 << p2 << p3 << block << reset;
+                oss << pos(x + 1, (y / 2) + 1)
+                    << fg(fg_[0], fg_[1], fg_[2])
+                    << bg(bg_[0], bg_[1], bg_[2])
+                    << block << reset;
             }
-            std::cout << oss.str() << std::flush;
+
+            std::cout << oss.str() << "\x1b[2J\x1b[H" << std::flush;
         }
 
         static void delete_pixels() {
-            coords.clear();
-            colors.clear();
+            pixel_map.clear();
         }
 };
