@@ -1,3 +1,4 @@
+#include <sstream>
 #include <iostream>
 #include <vector>
 #include <tuple>
@@ -38,8 +39,9 @@ class Pixel {
 
         static void draw_pixels() {
             SetConsoleOutputCP(CP_UTF8);
+            std::ostringstream oss;
+            oss << "\x1b[2J\x1b[H";
 
-            std::string output;
             for (size_t n = 0; n < coords.size(); ++n) {
                 int x = coords[n].first;
                 int y = coords[n].second;
@@ -80,9 +82,9 @@ class Pixel {
                 std::string p2 = fg(fg_[0], fg_[1], fg_[2]);
                 std::string p3 = bg(bg_[0], bg_[1], bg_[2]);
 
-                output += p1 + p2 + p3 + block + reset;
+                oss << p1 << p2 << p3 << block << reset;
             }
-            std::cout << output << std::flush;
+            std::cout << oss.str() << std::flush;
         }
 
         static void delete_pixels() {
